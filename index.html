@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shabda's Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font-family:"Fredoka",system-ui,sans-serif;color:#fff;background:radial-gradient(circle at 50% 30%,#3a0a22,#14050d 70%);-webkit-tap-highlight-color:transparent;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+
+#quiz{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.2rem;transition:opacity 1.6s ease,filter 1.6s ease}
+#quiz.gone{opacity:0;filter:blur(16px);pointer-events:none}
+#stack{position:relative;width:min(86vw,21rem);height:23rem}
+.card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(160deg,#fff,#ffe1ea);color:#5a2745;border-radius:22px;padding:1.5rem 1.3rem;box-shadow:0 22px 40px -18px #000d,0 0 34px -6px #ff7fa8aa;transform-origin:50% 100%;transition:transform .8s cubic-bezier(.2,.8,.2,1),opacity .7s ease,filter .7s ease}
+.card.out{transform:translate(120vw,-22vh) rotate(32deg)!important;opacity:0;filter:blur(10px)}
+.card.shake{animation:shake .45s}
+.qn{font-size:.85rem;opacity:.6;letter-spacing:.06em}
+h3{margin:.5rem 0 0;font-size:1.45rem;line-height:1.3;white-space:pre-line;font-weight:600}
+.body{display:flex;flex-direction:column;gap:.7rem}
+.card input{width:100%;font:inherit;font-size:1.15rem;padding:.8rem 1rem;border:2px solid #ffb3c1;border-radius:14px;outline:none;background:#fff;color:#5a2745}
+.card input:focus{border-color:#ff4d7d;box-shadow:0 0 18px #ff4d7d88}
+.opts{display:grid;gap:.55rem}
+.opt{font:inherit;font-size:1.05rem;padding:.7rem .9rem;border:2px solid #ffb3c1;border-radius:14px;background:#fff;color:#5a2745;cursor:pointer;text-align:left}
+.opt.sel{background:#ff4d7d;color:#fff;border-color:#ff4d7d;box-shadow:0 0 16px #ff4d7daa}
+.go{font:inherit;font-weight:600;font-size:1.05rem;border:0;border-radius:2rem;padding:.85rem;background:linear-gradient(135deg,#ff7fa8,#e11d2e);color:#fff;cursor:pointer;box-shadow:0 0 18px #ff4d7daa;animation:glow 2s ease-in-out infinite alternate}
+#prog{margin-top:1.4rem;opacity:.8;font-size:.95rem}
+
+#flash{position:fixed;inset:0;z-index:30;background:#ff0033;opacity:0;pointer-events:none}
+#flash.hit{animation:flash .7s ease-out}
+#wrong{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.8rem;padding:1.5rem;text-align:center;background:rgba(150,0,28,.94);opacity:0;pointer-events:none;transition:opacity .4s ease}
+#wrong.on{opacity:1;pointer-events:auto}
+#wrong h2{margin:0;font-size:clamp(1.6rem,7vw,2.4rem);line-height:1.25;text-shadow:0 0 22px #ff8a8a;animation:glow 1.6s ease-in-out infinite alternate}
+#retry{width:min(60vw,15rem)}
+
+#cv{position:fixed;inset:0;z-index:10;display:none;width:100%;height:100%}
+#hint{position:fixed;left:0;right:0;bottom:8vh;z-index:15;text-align:center;color:#ffd1e0;font-size:1.1rem;opacity:0;transition:opacity 1.2s ease;text-shadow:0 0 12px #ff4d7d}
+#anchor{position:fixed;z-index:20;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.9rem 1.4rem;border-radius:2rem;text-decoration:none;color:#fff;background:linear-gradient(135deg,#ff7fa8,#e11d2e);box-shadow:0 0 24px 4px #ff4d7daa;opacity:0;pointer-events:none;transition:opacity 1.5s ease;text-align:center;max-width:90vw}
+#anchor.on{opacity:1;pointer-events:auto;animation:glow 2s ease-in-out infinite alternate}
+#anchor .t{font-weight:600;font-size:1.1rem}
+#anchor .u{font-size:.72rem;opacity:.85;word-break:break-all}
+#anchor:focus-visible{outline:3px solid #ff9ad0;outline-offset:4px}
+
+@keyframes shake{0%,100%{translate:0 0}15%{translate:-10px 0}30%{translate:10px 0}45%{translate:-8px 0}60%{translate:8px 0}75%{translate:-4px 0}}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+@keyframes glow{from{box-shadow:0 0 10px #ff7fa8aa}to{box-shadow:0 0 30px 6px #ff4d7dcc}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+<div id="quiz">
+  <div id="stack"></div>
+  <div id="prog">0 of 4 ♥</div>
+</div>
+<div id="flash"></div>
+<div id="wrong">
+  <h2>MY SHABDU WOULD HAVE ANSWERED THIS</h2>
+  <button id="retry" class="go" type="button">Retry ♥</button>
+</div>
+<canvas id="cv"></canvas>
+<div id="hint"></div>
+<a id="anchor" href="https://safalroka7.github.io/Iloveshabdu/"><span class="t">Open our story ♥</span><span class="u">https://safalroka7.github.io/Iloveshabdu/</span></a>
+
+<script>
+const $ = s => document.querySelector(s);
+const LINK = "https://safalroka7.github.io/Iloveshabdu/";
+const LINK_TEXT = "https://safalroka7.github.io/Iloveshabdu/";
+
+const Q = [
+  { q: "What is your name?", type: "text", ans: ["shabda"] },
+  { q: "What does Safal call you?", type: "text", ans: ["shabdu"] },
+  { q: "What nickname did you give Safal?", type: "text", ans: ["jafal"] },
+  { q: "When is Safal's birthday?\n(month and day, AD)", type: "mcq", opts: ["Sep 21", "Oct 17", "Sep 14", "Sep 17"], ans: 3 }
+];
+
+function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+
+const stack = $('#stack'), quiz = $('#quiz'), prog = $('#prog'), wrong = $('#wrong'), flash = $('#flash');
+let queue = [], wrongCard = null;
+
+Q.forEach((q, i) => {
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.dataset.i = i;
+  c.innerHTML = '<div><div class="qn">Question ' + (i + 1) + ' of 4</div><h3></h3></div><div class="body"></div>';
+  c.querySelector('h3').textContent = q.q;
+  const body = c.querySelector('.body');
+  if (q.type === 'text') {
+    body.innerHTML = '<input type="text" placeholder="type here" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="go">Next ♥</button>';
+    body.querySelector('input').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  } else {
+    const opts = document.createElement('div');
+    opts.className = 'opts';
+    q.opts.forEach((o, k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'opt';
+      b.textContent = o;
+      b.addEventListener('click', () => {
+        c.dataset.sel = k;
+        opts.querySelectorAll('.opt').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+        buzz(15);
+      });
+      opts.appendChild(b);
+    });
+    body.appendChild(opts);
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'go';
+    go.textContent = 'Next ♥';
+    body.appendChild(go);
+  }
+  c.querySelector('.go').addEventListener('click', submit);
+  stack.appendChild(c);
+  queue.push(c);
+});
+
+function layout() {
+  queue.forEach((c, p) => {
+    c.style.zIndex = 50 - p;
+    c.style.transform = p ? `translate(${p * 8}px,${p * 10}px) rotate(${p * 1.8}deg) scale(${1 - p * 0.03})` : 'none';
+    c.style.pointerEvents = p ? 'none' : 'auto';
+  });
+}
+layout();
+
+function submit() {
+  const c = queue[0];
+  if (!c) return;
+  const q = Q[+c.dataset.i];
+  let ok;
+  if (q.type === 'text') {
+    const v = c.querySelector('input').value.trim().toLowerCase().replace(/\s+/g, '');
+    ok = q.ans.includes(v);
+  } else {
+    if (c.dataset.sel === undefined) { c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); buzz(20); return; }
+    ok = +c.dataset.sel === q.ans;
+  }
+  if (ok) {
+    queue.shift();
+    c.classList.add('out');
+    setTimeout(() => c.remove(), 900);
+    layout();
+    buzz(40);
+    prog.textContent = (4 - queue.length) + ' of 4 ♥';
+    if (!queue.length) setTimeout(finale, 900);
+  } else {
+    wrongCard = c;
+    c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+    flash.classList.remove('hit'); void flash.offsetWidth; flash.classList.add('hit');
+    buzz([120, 60, 120]);
+    setTimeout(() => wrong.classList.add('on'), 450);
+  }
+}
+
+$('#retry').addEventListener('click', () => {
+  wrong.classList.remove('on');
+  if (wrongCard) {
+    const inp = wrongCard.querySelector('input');
+    if (inp) inp.value = '';
+    wrongCard.querySelectorAll('.opt').forEach(b => b.classList.remove('sel'));
+    delete wrongCard.dataset.sel;
+    wrongCard.classList.remove('shake');
+  }
+  buzz(20);
+  setTimeout(() => { const inp = queue[0] && queue[0].querySelector('input'); if (inp) inp.focus(); }, 300);
+});
+
+/* ---------- finale: heart -> slow neutron blast with red/black trails -> "I LOVE YOU" + link ---------- */
+const cv = $('#cv'), ctx = cv.getContext('2d'), hint = $('#hint'), anchor = $('#anchor');
+let W, H, D, K, HX, HY, P = [], phase = 'idle', pt0 = 0, blastAt = 0, formAt = 0, last = 0, coreA = 0, flashA = 0, rings = [];
+const COLS = ['#ff7fa8', '#ff4d7d', '#ffd1e0', '#ffffff', '#ffb3c1', '#ff9ad0'];
+const WORDS = ['Shabda', 'Safal', 'love'];
+const HEARTS = ['❤️', '💖', '💗', '💕', '💘', '💞'];
+const PHASE_GATHER = 4500, PHASE_BLAST = 3600, PHASE_FORM = 4800;
+
+function size() {
+  D = Math.min(window.devicePixelRatio || 1, 1.5);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * D; cv.height = H * D;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(D, 0, 0, D, 0, 0);
+  HX = W / 2; HY = H * 0.42;
+  K = Math.min(W * 0.38, H * 0.3);
+}
+addEventListener('resize', () => { if (phase !== 'idle') size(); });
+
+/* clean heart outline (parametric) plus interior fill */
+function heartPts(outN, inN) {
+  const out = [];
+  for (let i = 0; i < outN; i++) {
+    const t = i / outN * Math.PI * 2;
+    const u = Math.pow(Math.sin(t), 3);
+    const v = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 16;
+    out.push([u, v, true]);
+  }
+  let guard = 0;
+  while (out.length < outN + inN && guard++ < 200000) {
+    const u = Math.random() * 2.4 - 1.2, v = Math.random() * 2.2 - 1.1;
+    if (Math.pow(u * u + v * v - 1, 3) - u * u * v * v * v <= 0) out.push([u, v, false]);
+  }
+  return out;
+}
+
+function showHint(t) {
+  hint.style.opacity = 0;
+  setTimeout(() => { hint.textContent = t; hint.style.opacity = 1; }, 500);
+}
+
+function finale() {
+  quiz.classList.add('gone');
+  setTimeout(() => { quiz.style.display = 'none'; }, 1700);
+  size();
+  cv.style.display = 'block';
+  ctx.fillStyle = '#0d0307';
+  ctx.fillRect(0, 0, W, H);
+  P = heartPts(380, 260).map(([u, v]) => {
+    const side = Math.random() * 4 | 0; let x, y;
+    if (side === 0) { x = -30; y = Math.random() * H; }
+    else if (side === 1) { x = W + 30; y = Math.random() * H; }
+    else if (side === 2) { x = Math.random() * W; y = -30; }
+    else { x = Math.random() * W; y = H + 30; }
+    const isH = Math.random() < 0.18;
+    return {
+      x, y, ox: u, oy: v, mode: 'heart', vx: 0, vy: 0, px: x, py: y, ang: 0, R: 0, tx: 0, ty: 0, r: 1.5,
+      isH, txt: isH ? HEARTS[Math.random() * HEARTS.length | 0] : WORDS[Math.random() * WORDS.length | 0],
+      col: COLS[Math.random() * COLS.length | 0]
+    };
+  });
+  phase = 'gather'; pt0 = performance.now(); last = pt0;
+  requestAnimationFrame(loop);
+}
+
+function blast() {
+  phase = 'blast'; blastAt = performance.now();
+  hint.style.opacity = 0;
+  buzz([900, 150, 500]);
+  coreA = 1; flashA = 0.7;
+  rings.push({ x: HX, y: HY, r: 20, a: 1 }, { x: HX, y: HY, r: 10, a: 0.8 });
+  P.forEach(p => {
+    const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * 9;
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    p.mode = 'blast';
+    p.px = p.x; p.py = p.y;
+    if (Math.random() < 0.4) { p.isH = true; p.txt = HEARTS[Math.random() * HEARTS.length | 0]; }
+    p.col = Math.random() < 0.5 ? '#ff1e46' : '#ffffff';
+  });
+}
+
+/* fit text to a max width by shrinking the font; returns {size, width} */
+function fitFont(str, weight, maxW, start) {
+  const c = document.createElement('canvas').getContext('2d');
+  let s = start;
+  for (; s > 8; s -= 1) {
+    c.font = weight + ' ' + s + 'px Fredoka, system-ui, sans-serif';
+    if (c.measureText(str).width <= maxW) break;
+  }
+  c.font = weight + ' ' + s + 'px Fredoka, system-ui, sans-serif';
+  return { size: s, width: c.measureText(str).width, weight };
+}
+
+/* sample the filled pixels of a text string into screen points */
+function sampleText(str, f, cx, cy, step) {
+  const w = Math.ceil(f.width) + 8, h = Math.ceil(f.size * 1.7);
+  const oc = document.createElement('canvas'); oc.width = w; oc.height = h;
+  const o = oc.getContext('2d');
+  o.font = f.weight + ' ' + f.size + 'px Fredoka, system-ui, sans-serif';
+  o.textAlign = 'center'; o.textBaseline = 'middle'; o.fillStyle = '#fff';
+  o.fillText(str, w / 2, h / 2);
+  const d = o.getImageData(0, 0, w, h).data, pts = [];
+  for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) {
+    if (d[(y * w + x) * 4 + 3] > 120) pts.push([cx - w / 2 + x, cy - h / 2 + y]);
+  }
+  return pts;
+}
+
+function formTargets() {
+  phase = 'form'; formAt = performance.now();
+  const big = fitFont('I LOVE YOU', 600, W * 0.86, Math.min(W * 0.2, 84));
+  const pts = sampleText('I LOVE YOU', big, HX, H * 0.5, 4);
+  // the link appears only after the words are formed
+  anchor.style.top = (H * 0.64) + 'px';
+
+  const ringN = 130, R = K * 1.45;
+  P.forEach((p, i) => {
+    if (i < ringN) {
+      p.mode = 'ring'; p.ang = i / ringN * Math.PI * 2; p.R = R * (0.92 + Math.random() * 0.16);
+      p.r = 1.2 + Math.random() * 1.0; p.col = Math.random() < 0.5 ? '#ff9ad0' : '#ffd1e0';
+    } else {
+      const q = pts[(i - ringN) % pts.length] || [HX, HY];
+      p.mode = 'btn'; p.tx = q[0]; p.ty = q[1]; p.r = 1.2;
+      p.col = Math.random() < 0.6 ? '#ffd1e0' : '#ffffff';
+    }
+  });
+}
+
+cv.addEventListener('pointerdown', () => { if (phase === 'heart') blast(); });
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const f = dt * 60;
+  const el = now - pt0;
+
+  if (phase === 'gather' && el > PHASE_GATHER) { phase = 'heart'; showHint('tap the heart ♥'); }
+  if (phase === 'blast' && now - blastAt > PHASE_BLAST) formTargets();
+  if (phase === 'form' && now - formAt > PHASE_FORM) { phase = 'done'; anchor.classList.add('on'); }
+
+  // fading background: black during the blast, deep red-black otherwise (gives smooth trails)
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = phase === 'blast' ? 'rgba(0,0,0,0.12)' : 'rgba(13,3,7,0.2)';
+  ctx.fillRect(0, 0, W, H);
+
+  const beat = phase === 'heart' ? 1 + 0.03 * Math.sin(now / 500) : 1;
+
+  // move
+  P.forEach(p => {
+    if (p.mode === 'blast') {
+      p.px = p.x; p.py = p.y;
+      p.x += p.vx * f; p.y += p.vy * f;
+      p.vx *= Math.pow(0.975, f); p.vy *= Math.pow(0.975, f);
+      return;
+    }
+    let tx, ty, k;
+    if (p.mode === 'heart') {
+      tx = HX + p.ox * K * beat; ty = HY - (p.oy + 0.17) * K * beat; k = 0.035;
+    } else if (p.mode === 'ring') {
+      const a = p.ang + now * 0.00018;
+      tx = HX + Math.cos(a) * p.R; ty = HY + Math.sin(a) * p.R * 0.36; k = 0.04;
+    } else {
+      tx = p.tx; ty = p.ty; k = 0.035;
+    }
+    const kk = 1 - Math.pow(1 - k, f);
+    p.x += (tx - p.x) * kk; p.y += (ty - p.y) * kk;
+  });
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  // red-black aura and trails during the blast
+  if (phase === 'blast') {
+    P.forEach(p => {
+      ctx.strokeStyle = 'rgba(255,20,70,0.55)';
+      ctx.lineWidth = p.isH ? 2.6 : 1.4;
+      ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.fillStyle = 'rgba(160,0,30,0.12)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.isH ? 14 : 8, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  // dots (planet ring and text)
+  ctx.globalAlpha = 0.9;
+  P.forEach(p => {
+    if (p.mode === 'ring' || p.mode === 'btn') {
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // words (one font setting for the whole batch)
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '12px Fredoka, system-ui, sans-serif';
+  P.forEach(p => {
+    if ((p.mode === 'heart' || p.mode === 'blast') && !p.isH) { ctx.fillStyle = p.col; ctx.fillText(p.txt, p.x, p.y); }
+  });
+  // hearts
+  ctx.font = '18px Fredoka, system-ui, sans-serif';
+  P.forEach(p => {
+    if ((p.mode === 'heart' || p.mode === 'blast') && p.isH) ctx.fillText(p.txt, p.x, p.y);
+  });
+
+  ctx.globalCompositeOperation = 'source-over';
+  if (coreA > 0.01) {
+    const g = ctx.createRadialGradient(HX, HY, 0, HX, HY, Math.max(W, H) * 0.5);
+    g.addColorStop(0, 'rgba(255,200,215,' + coreA * 0.8 + ')');
+    g.addColorStop(0.25, 'rgba(200,0,40,' + coreA * 0.4 + ')');
+    g.addColorStop(1, 'rgba(120,0,20,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    coreA *= Math.pow(0.97, f);
+  }
+  rings = rings.filter(r => r.a > 0.02);
+  rings.forEach(r => {
+    r.r += 6 * f; r.a *= Math.pow(0.97, f);
+    ctx.strokeStyle = 'rgba(255,40,80,' + r.a + ')';
+    ctx.lineWidth = 2 + r.a * 5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.stroke();
+  });
+  if (flashA > 0.01) {
+    ctx.fillStyle = 'rgba(255,220,230,' + flashA + ')';
+    ctx.fillRect(0, 0, W, H);
+    flashA *= Math.pow(0.93, f);
+  }
+}
+</script>
+</body>
+</html>
